@@ -51,6 +51,12 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--stamp);outline-
 .link{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;font-size:.9rem}
 .counter{color:var(--muted);font-size:.9rem;margin-top:.5rem;text-align:right}
 .ro .act{display:none!important}
+body.guest .hostonly{display:none!important}
+body:not(.guest) .guestonly{display:none!important}
+.rolebox{border:1.5px solid var(--line);border-radius:6px;padding:10px 16px 12px;margin:0 0 1.2rem;max-width:60ch}
+.rolebox h3{margin:0 0 .3rem}
+.rolebox .roles{margin:0 0 .4rem}
+.waiting{color:var(--muted);font-size:.92rem;font-style:italic}
 
 /* Lobby */
 .lobby{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:14px 18px 16px}
@@ -129,7 +135,7 @@ footer{color:var(--muted);font-size:.85rem;margin-top:22px;max-width:68ch}
       <p class="sub">Ein Diskussionsspiel für Gruppen: Theorie vorlesen, gemeinsam tippen, aufdecken, streiten.</p>
     </div>
     <div>
-      <button class="primary act" id="draw" onclick="draw()">Akte ziehen</button>
+      <button class="primary act hostonly" id="draw" onclick="draw()">Nächste Akte ziehen</button>
       <div class="counter" id="counter"></div>
     </div>
   </header>
@@ -150,7 +156,8 @@ footer{color:var(--muted);font-size:.85rem;margin-top:22px;max-width:68ch}
       <button class="primary" onclick="join()" id="joinbtn">Mitspielen</button>
     </div>
     <p class="note" id="note"></p>
-    <div class="lobby-foot act"><button class="link" onclick="newGame()">Neues Spiel starten</button></div>
+    <p class="note" id="hostline"></p>
+    <div class="lobby-foot act hostonly"><button class="link" onclick="newGame()">Neues Spiel starten</button></div>
   </section>
 
   <div class="folder">
@@ -315,7 +322,7 @@ const GUESS = [["wahr","Wahr"],["teilweise","Teilweise wahr"],["widerlegt","Wide
 const GLABEL = Object.fromEntries(GUESS);
 const ANS = {widerlegt:"widerlegt",satire:"satire",unbelegt:"widerlegt",erklaerbar:"widerlegt",teilweise:"teilweise",wahr:"wahr"};
 
-const fresh = () => ({deck:[],pos:0,cur:-1,round:0,revealed:false,answers:{},spark:-1,roles:null,timerEnd:null,timerLeft:180,gameId:"g0"});
+const fresh = () => ({deck:[],pos:0,cur:-1,round:0,revealed:false,answers:{},spark:-1,roles:null,timerEnd:null,timerLeft:180,gameId:"g0",host:null});
 let S = fresh(), players = {}, myId = null, online = new Set(), mode = "connecting", readOnly = false;
 let stateRef = null, playersCol = null, renderedRound = null;
 let stateChain = Promise.resolve(), playerChain = Promise.resolve();
@@ -324,6 +331,7 @@ const $ = id => document.getElementById(id);
 const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const isMulti = () => mode === "multi";
+const isHost = () => !isMulti() || !S.host || S.host === myId;
 const joined = () => Object.entries(players).filter(([, p]) => p && p.gameId === S.gameId);
 const amJoined = () => !!(players[myId] && players[myId].gameId === S.gameId);
 const score = p => Object.keys(S.answers || {}).filter(r => p.guesses && p.guesses[r] === S.answers[r]).length;
@@ -358,14 +366,15 @@ function pickRoles(){
   return {d:p[0], c:p[1]};
 }
 function draw(){
+  if (!isHost()) return;
   let deck = S.deck && S.deck.length === AKTEN.length ? S.deck.slice() : [];
   let pos = S.pos || 0;
   if (!deck.length || pos >= deck.length){ deck = shuffle(AKTEN.map((_, i) => i)); pos = 0; }
-  commit({deck, pos:pos + 1, cur:deck[pos], round:(S.round || 0) + 1, revealed:false, spark:-1, roles:pickRoles(), timerEnd:null, timerLeft:180});
+  commit({host:S.host || myId, deck, pos:pos + 1, cur:deck[pos], round:(S.round || 0) + 1, revealed:false, spark:-1, timerEnd:null, timerLeft:180});
   $("sheet").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"start"});
 }
 function reveal(){
-  if (S.cur < 0 || S.revealed) return;
+  if (!isHost() || S.cur < 0 || S.revealed) return;
   commit({revealed:true, answers:{...S.answers, [S.round]: ANS[AKTEN[S.cur].s]}});
 }
 function guess(g){
@@ -390,10 +399,11 @@ function join(){
   savePlayer(body);
 }
 function newGame(){
+  if (!isHost()) return;
   if (!confirm("Neues Spiel starten? Punkte und gezogene Akten werden zurückgesetzt, alle tragen sich neu ein.")) return;
   const g = "g" + Date.now().toString(36);
   if (!isMulti()) players = Object.fromEntries(Object.entries(players).map(([id, p]) => [id, {...p, gameId:g, guesses:{}}]));
-  commit({...fresh(), round:S.round || 0, gameId:g});
+  commit({...fresh(), round:S.round || 0, gameId:g, host:S.host});
 }
 let lastSpark = -1;
 function spark(){
@@ -415,11 +425,12 @@ function resetTimer(){ commit({timerEnd:null, timerLeft:180}); }
 
 /* ---------- Anzeige ---------- */
 function render(){
+  document.body.classList.toggle("guest", !isHost());
   $("counter").textContent = S.cur >= 0 ? `Akte ${S.pos} von ${AKTEN.length}` : `${AKTEN.length} Akten im Archiv`;
   $("tab").textContent = S.cur >= 0 ? `Akte Nr. ${String(S.cur + 1).padStart(3, "0")}` : "Archiv";
   if (S.cur < 0){
     if (renderedRound !== "empty"){
-      $("sheet").innerHTML = `<div class="empty"><p>Im Archiv liegen ${AKTEN.length} Akten – von Mondlandung bis Bielefeld. Einige sind widerlegt, einige Satire und ein paar leider wahr.</p><button class="ghost act" onclick="draw()">Erste Akte ziehen</button></div>`;
+      $("sheet").innerHTML = `<div class="empty"><p>Im Archiv liegen ${AKTEN.length} Akten – von Mondlandung bis Bielefeld. Einige sind widerlegt, einige Satire und ein paar leider wahr.</p><button class="ghost act hostonly" onclick="draw()">Erste Akte ziehen</button><p class="waiting guestonly">Warte, bis die Spielleitung die erste Akte zieht.</p></div>`;
       renderedRound = "empty";
     }
   } else if (renderedRound !== S.round){
@@ -432,7 +443,7 @@ function renderCard(){
   const a = AKTEN[S.cur], st = STATUS[a.s];
   $("sheet").innerHTML = `
     <div class="stamp ${st.c}" id="stamp">${st.label}</div>
-    <p class="cat">${esc(a.k)}</p>
+    <p class="cat" id="cat">${esc(a.k)}</p>
     <h2 class="title">${esc(a.t)}</h2>
     <h3 style="margin-top:.4rem">Die Behauptung</h3>
     <p>${esc(a.th)}</p>
@@ -440,7 +451,8 @@ function renderCard(){
       <p id="gq">Was glaubt ihr: wahr, teilweise wahr, widerlegt oder Satire?</p>
       <div class="gb act" id="gb">${GUESS.map(([v, l]) => `<button data-g="${v}" onclick="guess('${v}')">${l}</button>`).join("")}</div>
       <div class="guess-foot">
-        <button class="primary act" id="reveal" onclick="reveal()">Akte entschwärzen</button>
+        <button class="primary act hostonly" id="reveal" onclick="reveal()">Akte entschwärzen</button>
+        <span class="waiting guestonly" id="waitreveal">Die Spielleitung entschwärzt die Akte.</span>
         <span id="tally"></span>
       </div>
     </div>
@@ -448,23 +460,20 @@ function renderCard(){
     <p class="facts redacted" id="facts" aria-hidden="true"><span class="r">${esc(a.f)}</span></p>
     <ul class="results" id="results"></ul>
 
+    <div id="discuss">
     <h3>Fragen für die Runde</h3>
     <ol class="q">${a.q.map(x => `<li>${esc(x)}</li>`).join("")}</ol>
 
     <h3>Stichworte zum Anheizen</h3>
     <ul class="chips">${a.w.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
     <p class="hint">Wer ein Stichwort ins Gespräch bringt, muss erklären, was es mit der Theorie zu tun hat.</p>
+    </div>
 
     <div class="tools">
       <div>
         <h3>Zündstoff</h3>
         <button class="ghost act" onclick="spark()">Zündstoff nachlegen</button>
         <p class="spark" id="spark"></p>
-      </div>
-      <div>
-        <h3>Rollen</h3>
-        <ul class="roles" id="roles"></ul>
-        <button class="ghost act" onclick="roles()">Rollen neu verteilen</button>
       </div>
       <div>
         <h3>Redezeit</h3>
@@ -480,10 +489,13 @@ function renderCard(){
 function renderDyn(){
   if (S.cur < 0 || !$("facts")) return;
   const a = AKTEN[S.cur], rev = !!S.revealed, multi = isMulti();
+  $("discuss").hidden = !rev;
+  $("cat").style.visibility = rev ? "visible" : "hidden";
   const f = $("facts");
   f.classList.toggle("redacted", !rev);
   rev ? f.removeAttribute("aria-hidden") : f.setAttribute("aria-hidden", "true");
   $("stamp").classList.toggle("on", rev);
+  $("waitreveal").textContent = rev ? "" : "Die Spielleitung entschwärzt die Akte.";
   const rb = $("reveal"); rb.disabled = rev; rb.textContent = rev ? "Entschwärzt" : "Akte entschwärzen";
 
   const list = joined();
@@ -506,10 +518,6 @@ function renderDyn(){
   } else res.innerHTML = "";
 
   $("spark").textContent = S.spark >= 0 ? ZUENDSTOFF[S.spark] : "Wenn die Diskussion stockt: hier einen neuen Impuls ziehen.";
-  const nm = id => (players[id] && players[id].name) || "?";
-  $("roles").innerHTML = S.roles
-    ? `<li><b>${esc(nm(S.roles.d))}</b> verteidigt die Theorie – egal, was sie oder er glaubt.</li><li><b>${esc(nm(S.roles.c))}</b> prüft jedes Argument auf Belege.</li><li>Alle anderen sind Jury.</li>`
-    : `<li>${list.length < 2 ? "Sobald zwei mitspielen, werden Rollen verteilt." : "Noch keine Rollen verteilt."}</li>`;
   tick();
 }
 
@@ -518,9 +526,11 @@ function renderPlayers(){
   $("pl").innerHTML = list.length ? list.map(([id, p]) => {
     const g = S.cur >= 0 && !S.revealed && p.guesses && p.guesses[S.round];
     const dot = isMulti() ? `<span class="dot${isOn(p) ? " on" : ""}" title="${isOn(p) ? "online" : "nicht online"}"></span>` : "";
-    return `<li>${dot}<span>${esc(p.name)}${id === myId ? " (du)" : ""}</span>${isMulti() ? `<span class="pts">${score(p)}</span>` : ""}${g ? `<span class="tip">getippt</span>` : ""}</li>`;
+    return `<li>${dot}<span>${esc(p.name)}${id === myId ? " (du)" : ""}${isMulti() && id === S.host ? " – Spielleitung" : ""}</span>${isMulti() ? `<span class="pts">${score(p)}</span>` : ""}${g ? `<span class="tip">getippt</span>` : ""}</li>`;
   }).join("") : `<li class="none" style="background:none;border:0;padding-left:0">Noch niemand eingetragen.</li>`;
 
+  const hl = $("hostline");
+  if (hl) hl.textContent = !isMulti() ? "" : S.host === myId ? "Du bist Spielleitung: Nur du ziehst Akten und entschwärzt sie." : S.host ? "" : "Wer zuerst eine Akte zieht, wird Spielleitung.";
   const showJoin = !readOnly && (!isMulti() || !amJoined());
   $("join").style.display = showJoin ? "" : "none";
   $("joinbtn").textContent = isMulti() ? "Mitspielen" : "Hinzufügen";
@@ -557,14 +567,14 @@ function copyLink(){
   if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, () => prompt("Link kopieren:", url));
   else prompt("Link kopieren:", url);
 }
-function newRoom(){ location.hash = makeCode(); location.reload(); }
+function newRoom(){ const c = makeCode(); try { sessionStorage.setItem("geheimakte-created", c); } catch(e){} location.hash = c; location.reload(); }
 window.addEventListener("hashchange", () => location.reload());
 
 function goLocal(msg){
   mode = "local"; myId = null;
   $("mode").className = "mode";
   $("mode").textContent = "Nur auf diesem Gerät";
-  note(msg || "Ihr spielt gemeinsam an einem Bildschirm. Namen eintragen, damit Rollen verteilt werden können.");
+  note(msg || "Ihr spielt gemeinsam an einem Bildschirm.");
   render();
 }
 
@@ -581,7 +591,9 @@ render();
   } catch(e){ goLocal("Firebase konnte nicht geladen werden – ihr spielt an einem Bildschirm."); return; }
 
   let code = roomFromHash();
-  if (!code){ code = makeCode(); history.replaceState(null, "", "#" + code); }
+  let created = false;
+  try { created = sessionStorage.getItem("geheimakte-created") === code; } catch(e){}
+  if (!code){ code = makeCode(); history.replaceState(null, "", "#" + code); created = true; }
   $("roomcode").textContent = code; $("roomline").hidden = false;
 
   const app = fb.initializeApp(FIREBASE_CONFIG, "geheimakte");
@@ -594,8 +606,10 @@ render();
   let loaded = false;
   const t = setTimeout(() => { if (!loaded) note("Der Spielstand lädt noch – die Verbindung ist gerade langsam."); }, 10000);
   fb.onSnapshot(fb.doc(db, "rooms", code), s => {
+    const first = !loaded;
     if (!loaded){ loaded = true; clearTimeout(t); note(""); }
     if (s.exists()) S = {...fresh(), ...s.data()};
+    if (first && created && (!s.exists() || !S.host)){ commit({host:myId}); return; }
     render();
   }, e => { clearTimeout(t); onWriteErr(e); });
   fb.onSnapshot(fb.collection(db, "rooms", code, "players"), q => {
