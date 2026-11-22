@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Geheimakte – das Diskussionsspiel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Libre+Franklin:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --desk:#D6CFBF; --folder:#E7D19B; --folder-edge:#C9AE6E; --paper:#FBF7EC;
+  --ink:#1E2638; --muted:#5E5B50; --line:rgba(30,38,56,.18);
+  --redact:#16181D; --stamp:#B0281F; --stamp-ok:#2F6B3A; --stamp-mid:#8A5A12;
+  --chip:#EFE6CF; --btn:#1E2638; --btn-ink:#FBF7EC; --live:#2F8A47;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --desk:#1A1D22; --folder:#4A4030; --folder-edge:#6B5B3C; --paper:#262420;
+    --ink:#EDE6D3; --muted:#ADA690; --line:rgba(237,230,211,.18);
+    --redact:#8C846F; --stamp:#E8695E; --stamp-ok:#7DC08A; --stamp-mid:#E0AE5A;
+    --chip:#353128; --btn:#EDE6D3; --btn-ink:#1A1D22; --live:#6CCB86;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --desk:#1A1D22; --folder:#4A4030; --folder-edge:#6B5B3C; --paper:#262420;
+  --ink:#EDE6D3; --muted:#ADA690; --line:rgba(237,230,211,.18);
+  --redact:#8C846F; --stamp:#E8695E; --stamp-ok:#7DC08A; --stamp-mid:#E0AE5A;
+  --chip:#353128; --btn:#EDE6D3; --btn-ink:#1A1D22; --live:#6CCB86;
+  color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--desk);color:var(--ink);
+  font-family:"Libre Franklin",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  font-size:17px;line-height:1.55}
+.wrap{max-width:780px;margin:0 auto;padding:28px 18px 64px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
+h1{font-family:"Special Elite","Courier New",Courier,monospace;font-weight:400;font-size:clamp(2rem,6vw,3.1rem);line-height:1;margin:0;letter-spacing:.01em}
+.sub{margin:.4rem 0 0;color:var(--muted);max-width:44ch}
+button{font:inherit;cursor:pointer;border-radius:6px}
+button:disabled{cursor:default;opacity:.5}
+button:focus-visible,input:focus-visible{outline:3px solid var(--stamp);outline-offset:2px}
+.primary{background:var(--btn);color:var(--btn-ink);border:0;padding:.8rem 1.3rem;font-weight:700}
+.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--ink);padding:.55rem 1rem;font-weight:500}
+.link{background:none;border:0;padding:0;color:var(--muted);text-decoration:underline;font-size:.9rem}
+.counter{color:var(--muted);font-size:.9rem;margin-top:.5rem;text-align:right}
+.ro .act{display:none!important}
+
+/* Lobby */
+.lobby{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:14px 18px 16px}
+.lobby-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+.lobby h2{font-family:"Special Elite","Courier New",monospace;font-weight:400;font-size:1.3rem;margin:0}
+.mode{font-size:.88rem;color:var(--muted)}
+.mode.live::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--live);margin-right:6px;vertical-align:middle}
+.pl{list-style:none;margin:.7rem 0 0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.pl li{display:flex;align-items:center;gap:8px;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:.3rem .8rem;font-size:.95rem}
+.pl .dot{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.pl .dot.on{background:var(--live)}
+.pl .pts{font-weight:700}
+.pl .tip{color:var(--muted);font-size:.85rem}
+.pl .none{color:var(--muted)}
+.join{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.join input{flex:1 1 200px;font:inherit;padding:.6rem .8rem;border:1.5px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink)}
+.note{color:var(--muted);font-size:.9rem;margin:.6rem 0 0}
+.note:empty{display:none}
+.lobby-foot{margin-top:10px}
+.roomline{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;margin-top:4px;font-size:.92rem;color:var(--muted)}
+.roomline b{color:var(--ink);font-family:"Special Elite","Courier New",monospace;font-weight:400;font-size:1.05rem;letter-spacing:.08em}
+
+/* Ordner */
+.folder{position:relative;background:var(--folder);border:1px solid var(--folder-edge);border-radius:4px 10px 10px 10px;padding:14px;margin-top:46px}
+.tab{position:absolute;top:-30px;left:-1px;background:var(--folder);border:1px solid var(--folder-edge);border-bottom:0;border-radius:8px 8px 0 0;padding:4px 16px 6px;font-family:"Special Elite","Courier New",monospace;font-size:.95rem}
+.sheet{position:relative;background:var(--paper);border-radius:3px;padding:28px clamp(18px,4vw,40px) 34px;box-shadow:0 1px 0 var(--folder-edge)}
+.empty{text-align:center;padding:56px 10px;color:var(--muted)}
+.empty p{max-width:38ch;margin:0 auto 18px}
+.cat{color:var(--muted);font-size:.9rem;margin:0}
+h2.title{font-family:"Special Elite","Courier New",monospace;font-weight:400;font-size:clamp(1.6rem,4.6vw,2.3rem);line-height:1.15;margin:.25rem 0 1rem;max-width:22ch}
+h3{font-size:1rem;font-weight:700;margin:1.8rem 0 .5rem}
+p{margin:0 0 .8rem;max-width:68ch}
+.guess{border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:14px 0;margin:1.2rem 0 0}
+.guess > p{color:var(--muted);margin-bottom:.6rem}
+.gb{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.gb button{background:transparent;color:var(--ink);border:1.5px solid var(--line);padding:.5rem .9rem}
+.gb button.sel{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.guess-foot{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+.guess-foot span{color:var(--muted);font-size:.92rem}
+
+/* Schwärzung – der eine große Moment */
+.facts .r{box-decoration-break:clone;-webkit-box-decoration-break:clone;transition:background-color .7s ease,color .7s ease}
+.facts.redacted .r{background:var(--redact);color:transparent;border-radius:1px}
+.facts.redacted{user-select:none}
+.stamp{position:absolute;top:26px;right:clamp(10px,4vw,34px);font-family:"Special Elite","Courier New",monospace;font-size:clamp(1.1rem,3.6vw,1.55rem);padding:4px 12px;border:3px solid currentColor;border-radius:4px;transform:rotate(-9deg) scale(1.6);opacity:0;pointer-events:none;transition:transform .35s cubic-bezier(.2,1.6,.4,1),opacity .2s}
+.stamp.on{opacity:.9;transform:rotate(-9deg) scale(1)}
+.s-bad{color:var(--stamp)} .s-ok{color:var(--stamp-ok)} .s-mid{color:var(--stamp-mid)}
+.results{list-style:none;padding:0;margin:.4rem 0 0}
+.results li{margin-bottom:.2rem}
+.results .ok{color:var(--stamp-ok);font-weight:700}
+.results .no{color:var(--stamp);font-weight:700}
+
+ol.q{margin:0;padding-left:1.3rem;max-width:66ch}
+ol.q li{margin-bottom:.4rem}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.chips li{background:var(--chip);border:1px solid var(--line);padding:.3rem .7rem;border-radius:999px;font-size:.92rem}
+.hint{color:var(--muted);font-size:.9rem;margin:.5rem 0 0}
+
+.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:22px;margin-top:1.8rem;border-top:1px solid var(--line);padding-top:6px}
+.tools h3{margin-top:1rem}
+.spark{min-height:3.2em;font-style:italic;margin:.6rem 0 0}
+.timer{font-family:"Special Elite","Courier New",monospace;font-size:2.2rem;line-height:1;margin:.2rem 0 .6rem}
+.timer.done{color:var(--stamp)}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.roles{margin:.6rem 0 0;padding:0;list-style:none}
+.roles li{margin-bottom:.3rem}
+footer{color:var(--muted);font-size:.85rem;margin-top:22px;max-width:68ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Geheimakte</h1>
+      <p class="sub">Ein Diskussionsspiel für Gruppen: Theorie vorlesen, gemeinsam tippen, aufdecken, streiten.</p>
+    </div>
+    <div>
+      <button class="primary act" id="draw" onclick="draw()">Akte ziehen</button>
+      <div class="counter" id="counter"></div>
+    </div>
+  </header>
+
+  <section class="lobby" aria-label="Mitspielende">
+    <div class="lobby-head">
+      <h2>Mitspielende</h2>
+      <span class="mode" id="mode">Verbinde …</span>
+    </div>
+    <div class="roomline" id="roomline" hidden>
+      <span>Raum <b id="roomcode"></b></span>
+      <button class="link" onclick="copyLink()" id="copybtn">Einladungslink kopieren</button>
+      <button class="link" onclick="newRoom()">Neuen Raum öffnen</button>
+    </div>
+    <ul class="pl" id="pl"></ul>
+    <div class="join act" id="join">
+      <input id="name" type="text" maxlength="30" placeholder="Dein Name" autocomplete="nickname" onkeydown="if(event.key==='Enter')join()">
+      <button class="primary" onclick="join()" id="joinbtn">Mitspielen</button>
+    </div>
+    <p class="note" id="note"></p>
+    <div class="lobby-foot act"><button class="link" onclick="newGame()">Neues Spiel starten</button></div>
+  </section>
+
+  <div class="folder">
+    <div class="tab" id="tab">Archiv</div>
+    <div class="sheet" id="sheet"></div>
+  </div>
+
+  <footer>Ablauf: 1. Eine Person zieht eine Akte und liest die Behauptung vor. 2. Alle tippen auf ihrem Gerät: wahr, teilweise wahr, widerlegt oder Satire. 3. Akte entschwärzen – richtige Tipps geben einen Punkt. 4. Mit Fragen, Stichworten und Zündstoff weiterdiskutieren.</footer>
+</div>
+
+<script type="module">
+/* ===== HIER DEINE FIREBASE-KONFIGURATION EINFÜGEN =====
+   Firebase-Konsole > Projekteinstellungen > Deine Apps > Web-App > Konfiguration.
+   Leer gelassen läuft das Spiel nur auf einem Gerät. */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDSHkMAntt8odjUF32QPHWCV0AuWxI3qIo",
+  authDomain: "spiel-verschwoerungstheorien.firebaseapp.com",
+  projectId: "spiel-verschwoerungstheorien",
+  storageBucket: "spiel-verschwoerungstheorien.firebasestorage.app",
+  messagingSenderId: "751620380883",
+  appId: "1:751620380883:web:ed4c07693a6f1cb2afdc26"
+};
+/* ===================================================== */
+
+const AKTEN = [
+{t:"Die Mondlandung war gefälscht",k:"Weltall",s:"widerlegt",
+ th:"Die NASA habe die Mondlandungen ab 1969 im Studio inszeniert, um das Wettrennen gegen die Sowjetunion zu gewinnen. Als Belege gelten die „wehende“ Flagge, fehlende Sterne auf den Fotos und Schatten in verschiedene Richtungen.",
+ f:"Die Flagge hatte eine Querstange und schwang im Vakuum ohne Luftwiderstand lange nach. Sterne fehlen, weil die Kameras auf die grelle Mondoberfläche belichtet waren. Die Astronauten brachten 382 kg Mondgestein mit, und auf dem Mond stehen Laser-Reflektoren, die Observatorien bis heute anpeilen. Die Sowjetunion verfolgte die Missionen selbst und hat nie widersprochen.",
+ q:["Warum hätte ausgerechnet die Sowjetunion geschwiegen?","Was wäre 1969 schwieriger gewesen: zum Mond fliegen oder es perfekt fälschen?","Warum hält sich die Theorie trotz aller Gegenbeweise?"],
+ w:["Kalter Krieg","Stanley Kubrick","Laser-Reflektoren","400.000 Mitwisser","Bill Kaysing"]},
+{t:"Die Erde ist flach",k:"Weltall",s:"widerlegt",
+ th:"Die Erde sei eine Scheibe, umgeben von einer Eiswand – der Antarktis. Fotos aus dem All seien gefälscht, Regierungen und Raumfahrtbehörden hielten die Wahrheit zurück.",
+ f:"Schon Eratosthenes berechnete um 240 v. Chr. den Erdumfang über Schattenwinkel in zwei Städten. Schiffe verschwinden rumpfvoran hinter dem Horizont, und Zeitzonen sowie der runde Erdschatten bei Mondfinsternissen passen nur zu einer Kugel. Dass man im Mittelalter allgemein an eine flache Erde glaubte, ist übrigens selbst ein Mythos.",
+ q:["Wie würdet ihr ohne Technik beweisen, dass die Erde rund ist?","Warum ist die Bewegung gerade im Internetzeitalter gewachsen?","Ist das Überzeugung, Provokation oder Gemeinschaftsgefühl?"],
+ w:["Eratosthenes","Eiswand","Horizont","YouTube-Algorithmus","Zugehörigkeit"]},
+{t:"Bielefeld gibt es nicht",k:"Satire",s:"satire",
+ th:"Bielefeld existiere gar nicht. Wer behauptet, dort zu wohnen, sei eingeweiht – oder selbst ein Opfer der Verschwörung.",
+ f:"Reine Satire: 1994 von Achim Held im Usenet erfunden, um Verschwörungsdenken aufs Korn zu nehmen. Die Stadt hat rund 340.000 Einwohner und spielte 2019 selbst mit: eine Million Euro für einen Beweis, dass es sie nicht gibt. Gewonnen hat niemand.",
+ q:["Wie beweist man eigentlich, dass etwas existiert?","Warum funktionieren solche Parodien so gut?","Kennt ihr jemanden aus Bielefeld – wirklich?"],
+ w:["Usenet 1994","Beweislast","Selbstironie","„Sie“","Bielefeld-Million"]},
+{t:"Paul McCartney ist tot",k:"Promis & Popkultur",s:"widerlegt",
+ th:"Paul McCartney sei 1966 bei einem Autounfall gestorben und durch einen Doppelgänger ersetzt worden. Die Beatles hätten Hinweise versteckt – etwa auf dem Abbey-Road-Cover, wo Paul barfuß geht.",
+ f:"Das Gerücht verbreitete sich 1969 über US-Studentenzeitungen und Radiosender. McCartney gab noch im selben Jahr ein Interview, um es zu widerlegen, und steht bis heute auf der Bühne. Die „Hinweise“ sind klassische Mustererkennung: Wer sucht, der findet.",
+ q:["Ab wann wird Mustersuchen zum Problem?","Warum lieben Fans versteckte Botschaften?","Würde so ein Gerücht heute schneller oder langsamer sterben?"],
+ w:["Abbey Road","Rückwärts abspielen","Doppelgänger","Apophänie","Marketing-Trick?"]},
+{t:"Vögel sind Überwachungsdrohnen",k:"Satire",s:"satire",
+ th:"Alle Vögel in den USA seien zwischen 1959 und 2001 durch Drohnen der Regierung ersetzt worden. Auf Stromleitungen säßen sie nur, um sich aufzuladen.",
+ f:"Eine bewusste Satirebewegung („Birds Aren’t Real“), 2017 von Peter McIndoe gestartet. Sie parodierte Verschwörungsdenken so überzeugend, dass manche sie ernst nahmen. 2021 gab McIndoe öffentlich zu, dass alles Satire ist.",
+ q:["Kann man Verschwörungsdenken mit Satire bekämpfen?","Woran erkennt man Satire, wenn sie perfekt gespielt ist?","Wo ist die Grenze zwischen Spaß und Desinformation?"],
+ w:["Stromleitungen","Poe’s Law","Merchandise","Gen Z","Ironie"]},
+{t:"Das frühe Mittelalter wurde erfunden",k:"Geschichte",s:"widerlegt",
+ th:"Die Jahre 614 bis 911 hätten nie stattgefunden. Kaiser Otto III. und Papst Silvester II. hätten den Kalender manipuliert, um im Jahr 1000 zu regieren. Karl der Große sei eine Erfindung.",
+ f:"Die „Phantomzeit“-These verbreitete Heribert Illig ab 1991. Baumring-Datierung, Radiokarbonmessungen, überlieferte Sonnenfinsternisse und Quellen aus China und der islamischen Welt belegen die Jahrhunderte durchgehend. Die Geschichtswissenschaft lehnt die These einhellig ab.",
+ q:["Wie sicher ist unser Wissen über Geschichte eigentlich?","Wer hätte weltweit alles mitspielen müssen?","Warum ist ausgerechnet Karl der Große ein Ziel?"],
+ w:["Karl der Große","Baumringe","Kalenderreform","Islamische Quellen","Urkundenfälschung"]},
+{t:"Area 51 versteckt Aliens",k:"Staat & Geheimdienste",s:"teilweise",
+ th:"In der geheimen Militärbasis in Nevada würden abgestürzte UFOs und Alien-Leichen untersucht – auch die vom angeblichen Absturz in Roswell 1947.",
+ f:"Die Basis gibt es wirklich; die CIA hat sie 2013 offiziell anerkannt. Dort wurden Spionageflugzeuge wie die U-2 getestet, deren ungewöhnliche Flughöhen viele UFO-Sichtungen erklären. Roswell war laut US-Luftwaffe ein Ballon des geheimen Projekts Mogul. Belege für Aliens gibt es keine.",
+ q:["Macht echte Geheimhaltung Verschwörungstheorien glaubwürdiger?","Wann ist Misstrauen gegenüber Regierungen berechtigt?","Was müsstet ihr sehen, um an Aliens zu glauben?"],
+ w:["U-2","Projekt Mogul","Storm Area 51","Geheimhaltung","UAP-Berichte"]},
+{t:"Chemtrails",k:"Alltag",s:"widerlegt",
+ th:"Die weißen Streifen hinter Flugzeugen seien versprühte Chemikalien – zur Wetterkontrolle, zur Steuerung oder gar Vergiftung der Bevölkerung.",
+ f:"Kondensstreifen entstehen, wenn Wasserdampf aus den Triebwerken in der kalten Höhe gefriert; wie lange sie bleiben, hängt von der Luftfeuchte ab. In einer Befragung 2016 sahen 76 von 77 Atmosphärenforschern keinerlei Hinweis auf ein geheimes Sprühprogramm. Geoengineering wird tatsächlich diskutiert – aber offen.",
+ q:["Warum bleiben manche Streifen lange und andere nicht?","Ist offen erforschtes Geoengineering beruhigend oder beunruhigend?","Wie spricht man mit jemandem, der das glaubt?"],
+ w:["Kondensstreifen","Luftfeuchte","Geoengineering","Piloten","Wolkenimpfen"]},
+{t:"Elvis lebt",k:"Promis & Popkultur",s:"widerlegt",
+ th:"Elvis Presley habe 1977 seinen Tod vorgetäuscht, um dem Ruhm zu entkommen. Seitdem sei er an Tankstellen und in Supermärkten gesichtet worden.",
+ f:"Elvis starb am 16. August 1977 in Graceland; Autopsie und Sterbeurkunde sind dokumentiert. Angebliche Beweise wie die Schreibweise „Aaron“ statt „Aron“ auf dem Grabstein haben banale Erklärungen – er selbst wollte später die biblische Schreibweise.",
+ q:["Warum wollen wir nicht, dass Ikonen sterben?","Welche anderen Stars „leben“ angeblich noch?","Ist so eine Theorie harmlos oder respektlos?"],
+ w:["Graceland","Aron / Aaron","Sichtungen","Trauer","Kultstatus"]},
+{t:"Finnland existiert nicht",k:"Satire",s:"satire",
+ th:"Finnland sei eine Erfindung Japans und Russlands, um Fischereirechte in der Ostsee zu sichern. Wo Finnland sein soll, sei nur Meer – und Nokia eigentlich japanisch.",
+ f:"Um 2015 als Witz auf Reddit entstanden. Finnland hat rund 5,6 Millionen Einwohner und ist Mitglied von EU und NATO. Die Theorie lebt als Running Gag weiter.",
+ q:["Warum werden absurde Theorien so gern geteilt?","Was unterscheidet einen Witz von Desinformation?","Welche Belege für ein Land habt ihr selbst je gesehen?"],
+ w:["Reddit","Fischereirechte","Nokia","Running Gag","Kartenfälschung"]},
+{t:"Die Erde ist innen hohl",k:"Weltall",s:"widerlegt",
+ th:"Die Erde sei innen hohl, mit einer eigenen Sonne und verborgenen Zivilisationen. Die Eingänge lägen an den Polen.",
+ f:"Der Astronom Edmond Halley schlug 1692 hohle Schalen vor, um Schwankungen des Magnetfelds zu erklären – damals ernsthafte Wissenschaft. Erdbebenwellen zeigen heute klar einen festen inneren und flüssigen äußeren Kern. Die Polgebiete sind längst kartiert und überflogen.",
+ q:["Wann ist eine Idee wissenschaftlich – und wann nicht mehr?","Darf eine widerlegte Idee trotzdem inspirieren?","Warum sind die Pole so beliebt für Mythen?"],
+ w:["Edmond Halley","Erdbebenwellen","Jules Verne","Polöffnungen","Agartha"]},
+{t:"Der Mandela-Effekt",k:"Alltag",s:"erklaerbar",
+ th:"Viele Menschen erinnern sich auf die gleiche Weise falsch – etwa daran, dass Nelson Mandela in den 1980ern im Gefängnis starb. Manche schließen daraus auf Paralleluniversen oder veränderte Zeitlinien.",
+ f:"Den Begriff prägte Fiona Broome 2009. Die Psychologie erklärt das Phänomen mit rekonstruktivem Gedächtnis: Erinnerungen werden bei jedem Abruf neu zusammengesetzt, Logos und Namen an vertraute Muster angeglichen. Weil viele dieselben Schemata haben, irren sie auch gleich.",
+ q:["Welche „Mandela-Erinnerung“ habt ihr selbst?","Wie sehr können wir unserem Gedächtnis trauen – auch vor Gericht?","Warum ist „Paralleluniversum“ attraktiver als „Ich irre mich“?"],
+ w:["Gedächtnis","Logos","Augenzeugen","Paralleluniversum","Schemata"]},
+{t:"Gesunken ist gar nicht die Titanic",k:"Geschichte",s:"widerlegt",
+ th:"1912 sei nicht die Titanic gesunken, sondern ihr beschädigtes Schwesterschiff Olympic – absichtlich versenkt, um die Versicherung zu kassieren.",
+ f:"Robin Gardiner verbreitete die These 1998 in einem Buch. Am Wrack wurde die Baunummer 401 der Titanic gefunden (die Olympic hatte 400), und die Schiffe unterschieden sich sichtbar, etwa bei den Fenstern am Promenadendeck. Außerdem war die Titanic deutlich unterversichert.",
+ q:["Wie groß müsste eine Verschwörung sein, die 1.500 Tote in Kauf nimmt?","Warum ranken sich um Katastrophen so viele Mythen?","Was sagt die Theorie über unser Bild von Konzernen?"],
+ w:["Olympic","Baunummer 401","Versicherungsbetrug","J.P. Morgan","Promenadendeck"]},
+{t:"Shakespeare war nicht Shakespeare",k:"Geschichte",s:"unbelegt",
+ th:"Ein Handschuhmachersohn aus Stratford ohne Universitätsbildung könne diese Werke nicht geschrieben haben. Der wahre Autor sei etwa Edward de Vere, Earl of Oxford.",
+ f:"Zeitgenossen wie Ben Jonson schrieben Shakespeare die Werke ausdrücklich zu. Edward de Vere starb 1604 – vor mehreren Stücken, die auf spätere Ereignisse anspielen. Die Literaturwissenschaft sieht Shakespeare fast einhellig als Autor; belegt sind allerdings Mitautorschaften bei einzelnen Stücken.",
+ q:["Ist Genie an Herkunft und Bildung gebunden?","Warum zweifelten selbst Berühmtheiten wie Mark Twain?","Ist es überhaupt wichtig, wer es geschrieben hat?"],
+ w:["Edward de Vere","Klassismus","Ben Jonson","Mitautorschaft","Mark Twain"]},
+{t:"Der Bunker unter dem Flughafen Denver",k:"Staat & Geheimdienste",s:"unbelegt",
+ th:"Der Flughafen Denver sei die Fassade für einen unterirdischen Bunker der Eliten. Düstere Wandgemälde, eine Pferdestatue mit roten Augen und jahrelange Bauverzögerungen seien die Hinweise.",
+ f:"Verzögerung und Kostenexplosion bis zur Eröffnung 1995 lagen vor allem an einem gescheiterten automatischen Gepäcksystem. Die Wandbilder sind Kunst zu Umwelt und Frieden. Die Pferdestatue erschlug bei der Fertigung tatsächlich ihren Bildhauer – ein tragischer Unfall, der den Mythos befeuert. Der Flughafen spielt inzwischen selbst mit den Gerüchten.",
+ q:["Warum wirken manche Orte „verdächtig“?","Ist Selbstironie die beste PR-Strategie?","Welche Orte in eurer Nähe haben eigene Mythen?"],
+ w:["Blucifer","Gepäcksystem","Wandgemälde","Bunker","Freimaurer-Stein"]},
+{t:"Avril Lavigne wurde ersetzt",k:"Promis & Popkultur",s:"satire",
+ th:"Avril Lavigne sei 2003 gestorben und durch eine Doppelgängerin namens „Melissa“ ersetzt worden. Belege: andere Handschrift, andere Gesichtszüge, plötzlicher Stilwechsel.",
+ f:"Die Geschichte entstand 2011 auf einem brasilianischen Blog, der später einräumte, sie als Beispiel dafür geschrieben zu haben, wie Verschwörungstheorien entstehen. Lavigne selbst findet sie lustig und ist weiter aktiv.",
+ q:["Warum wird ein Stilwechsel bei Stars so misstrauisch beäugt?","Wie schnell würde so etwas heute auffliegen?","Was macht Fotovergleiche so trügerisch?"],
+ w:["Melissa","Brasilien-Blog","Doppelgängerin","Stilwechsel","Bildvergleich"]},
+{t:"Aliens bauten die Pyramiden",k:"Geschichte",s:"widerlegt",
+ th:"Die alten Ägypter hätten die Pyramiden von Gizeh nicht selbst bauen können – zu präzise, zu schwer, zu groß. Also Außerirdische oder eine verlorene Hochkultur.",
+ f:"Archäologen fanden Arbeitersiedlungen, Gräber der Bauleute und das Tagebuch des Beamten Merer, das den Transport von Kalksteinblöcken beschreibt. Rampen, Schlitten und angefeuchteter Sand sind belegt. Die Theorie unterschätzt systematisch die Leistung nichteuropäischer Kulturen.",
+ q:["Warum trauen wir antiken Menschen so wenig zu?","Welche Rolle spielen TV-Dokus für solche Ideen?","Was beeindruckt euch mehr: Aliens oder perfekte Organisation?"],
+ w:["Merer-Tagebuch","Arbeitersiedlungen","Rampen","Erich von Däniken","Eurozentrismus"]},
+{t:"Geräte gehen absichtlich kaputt",k:"Alltag",s:"wahr",
+ th:"Hersteller sorgten absichtlich dafür, dass Produkte schnell kaputtgehen, damit man neu kaufen muss – angefangen bei der Glühbirne.",
+ f:"Für Glühbirnen stimmt das: 1924 gründeten große Hersteller wie Osram und Philips das Phoebus-Kartell und begrenzten die Lebensdauer auf 1.000 Stunden – mit Strafzahlungen für Birnen, die länger hielten. Wie verbreitet geplante Obsoleszenz heute ist, bleibt umstritten; oft stecken eher Kostendruck und Designentscheidungen dahinter.",
+ q:["Kennt ihr Geräte, die „pünktlich nach der Garantie“ kaputtgingen?","Wo ist die Grenze zwischen Sparen und Absicht?","Hilft ein Recht auf Reparatur?"],
+ w:["1.000 Stunden","Phoebus-Kartell","Recht auf Reparatur","Druckerpatronen","Akku-Drosselung"]},
+{t:"Die CIA testete Gedankenkontrolle",k:"Staat & Geheimdienste",s:"wahr",
+ th:"Die CIA habe heimlich Menschenversuche mit Drogen und psychologischen Techniken durchgeführt, um Gedankenkontrolle zu erforschen.",
+ f:"Stimmt: Das Programm MKUltra lief ab 1953 rund zwei Jahrzehnte, teils ohne Wissen der Betroffenen, unter anderem mit LSD. 1973 ließ CIA-Chef Richard Helms viele Akten vernichten; erhalten gebliebene Unterlagen wurden 1977 bekannt und im US-Senat untersucht.",
+ q:["Macht so ein Fall alle Verschwörungstheorien glaubwürdiger?","Was unterscheidet MKUltra methodisch von Chemtrails?","Wie kam die Wahrheit überhaupt ans Licht?"],
+ w:["LSD","Aktenvernichtung","Senatsanhörung","Informationsfreiheit","Kalter Krieg"]},
+{t:"Anschläge unter falscher Flagge",k:"Staat & Geheimdienste",s:"wahr",
+ th:"Das US-Militär habe Anschläge geplant, die man einem Gegner in die Schuhe schieben wollte, um einen Krieg zu rechtfertigen.",
+ f:"Für 1962 belegt: Mit der „Operation Northwoods“ schlug der Vereinigte Generalstab vor, Angriffe vorzutäuschen und Kuba die Schuld zu geben, um eine Invasion zu rechtfertigen. Die Regierung Kennedy lehnte ab. Das Dokument wurde 1997 freigegeben.",
+ q:["Reicht ein abgelehnter Plan als Beleg für spätere Theorien?","Warum werden solche Dokumente überhaupt freigegeben?","Wo verläuft die Grenze zwischen kritisch und paranoid?"],
+ w:["Falsche Flagge","Kuba","Freigabe 1997","Kennedy","Beweiskette"]},
+{t:"Die Simpsons sagen die Zukunft voraus",k:"Promis & Popkultur",s:"erklaerbar",
+ th:"Die Simpsons hätten zahllose Ereignisse vorhergesagt – von Präsident Trump bis zu neuen Technologien. Die Autoren hätten Insiderwissen.",
+ f:"Bei fast 800 Folgen über mehr als 35 Jahre sind Treffer statistisch zu erwarten. Viele „Vorhersagen“ sind satirische Zuspitzungen damals aktueller Themen, andere kursieren als bearbeitete Screenshots oder ohne Kontext. Der Trump-Gag von 2000 spielte auf dessen damals bekannte Präsidentschaftspläne an.",
+ q:["Wie viele Fehlprognosen ignorieren wir dabei?","Warum faszinieren uns „Prophezeiungen“ so?","Welche Serie wird als Nächstes „recht behalten“?"],
+ w:["Gesetz der großen Zahlen","Selektionsbias","Fake-Screenshots","Satire","Bart to the Future"]}
+];
+
+const STATUS = {
+  widerlegt:{label:"Widerlegt",c:"s-bad"},
+  satire:{label:"Satire",c:"s-bad"},
+  unbelegt:{label:"Unbelegt",c:"s-mid"},
+  erklaerbar:{label:"Erklärbar",c:"s-mid"},
+  teilweise:{label:"Teilweise wahr",c:"s-mid"},
+  wahr:{label:"Wahr",c:"s-ok"}
+};
+
+const ZUENDSTOFF = [
+ "Wie viele Menschen müssten dichthalten – und wie lange?",
+ "Wem nützt es, wenn viele Menschen das glauben?",
+ "Was würde euch umstimmen? Und was die Überzeugten?",
+ "Ockhams Rasiermesser: Welche Erklärung braucht die wenigsten Annahmen?",
+ "Beweislast: Wer muss hier eigentlich was beweisen?",
+ "Rollentausch: Die größte Skeptikerin verteidigt jetzt die Theorie.",
+ "Gab es einen ähnlichen Fall, der sich als wahr herausgestellt hat?",
+ "Formuliert die Theorie als viralen Post in einem Satz. Warum zündet das?",
+ "Harmlos oder gefährlich? Wem könnte diese Theorie schaden?",
+ "Nennt das stärkste Argument der Gegenseite – ehrlich.",
+ "60 Sekunden: Überzeugt die Person rechts neben euch.",
+ "Welche Emotion bedient die Theorie: Angst, Neugier, Misstrauen oder Humor?",
+ "Wie würde eine Journalistin diese Behauptung prüfen?",
+ "Würdet ihr es glauben, wenn eure beste Freundin es erzählt?",
+ "Welche Quelle würdet ihr hier sofort akzeptieren – und warum gerade die?"
+];
+
+
+const GUESS = [["wahr","Wahr"],["teilweise","Teilweise wahr"],["widerlegt","Widerlegt"],["satire","Satire"]];
+const GLABEL = Object.fromEntries(GUESS);
+const ANS = {widerlegt:"widerlegt",satire:"satire",unbelegt:"widerlegt",erklaerbar:"widerlegt",teilweise:"teilweise",wahr:"wahr"};
+
+const fresh = () => ({deck:[],pos:0,cur:-1,round:0,revealed:false,answers:{},spark:-1,roles:null,timerEnd:null,timerLeft:180,gameId:"g0"});
+let S = fresh(), players = {}, myId = null, online = new Set(), mode = "connecting", readOnly = false;
+let stateRef = null, playersCol = null, renderedRound = null;
+let stateChain = Promise.resolve(), playerChain = Promise.resolve();
+
+const $ = id => document.getElementById(id);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const isMulti = () => mode === "multi";
+const joined = () => Object.entries(players).filter(([, p]) => p && p.gameId === S.gameId);
+const amJoined = () => !!(players[myId] && players[myId].gameId === S.gameId);
+const score = p => Object.keys(S.answers || {}).filter(r => p.guesses && p.guesses[r] === S.answers[r]).length;
+
+/* ---------- Schreiben ---------- */
+function onWriteErr(e){
+  console.error(e);
+  if (e && e.code === "permission-denied") note("Firebase lehnt das Speichern ab. Prüfe die Firestore-Regeln.");
+  else note("Eine Änderung konnte nicht gespeichert werden. Prüfe die Internetverbindung.");
+}
+function commit(patch){
+  S = {...S, ...patch};
+  render();
+  if (!stateRef) return;
+  const body = JSON.parse(JSON.stringify(S));
+  stateChain = stateChain.then(() => stateRef.set(body)).catch(onWriteErr);
+}
+function savePlayer(body){
+  players = {...players, [myId]: body};
+  renderPlayers(); renderDyn();
+  if (!playersCol) return;
+  const copy = JSON.parse(JSON.stringify(body));
+  playerChain = playerChain.then(() => playersCol.doc(myId).set(copy)).catch(onWriteErr);
+}
+function note(t){ $("note").textContent = t; }
+
+/* ---------- Aktionen ---------- */
+function pickRoles(){
+  const ids = joined().map(([id]) => id);
+  if (ids.length < 2) return null;
+  const p = shuffle(ids.slice());
+  return {d:p[0], c:p[1]};
+}
+function draw(){
+  let deck = S.deck && S.deck.length === AKTEN.length ? S.deck.slice() : [];
+  let pos = S.pos || 0;
+  if (!deck.length || pos >= deck.length){ deck = shuffle(AKTEN.map((_, i) => i)); pos = 0; }
+  commit({deck, pos:pos + 1, cur:deck[pos], round:(S.round || 0) + 1, revealed:false, spark:-1, roles:pickRoles(), timerEnd:null, timerLeft:180});
+  $("sheet").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block:"start"});
+}
+function reveal(){
+  if (S.cur < 0 || S.revealed) return;
+  commit({revealed:true, answers:{...S.answers, [S.round]: ANS[AKTEN[S.cur].s]}});
+}
+function guess(g){
+  if (!amJoined()){ $("name").focus(); note("Trag zuerst deinen Namen ein."); return; }
+  if (S.revealed || S.cur < 0) return;
+  const me = players[myId];
+  savePlayer({...me, lastSeen:Date.now(), guesses:{...(me.guesses || {}), [S.round]: g}});
+}
+function join(){
+  const name = $("name").value.trim().slice(0, 30);
+  if (!name){ $("name").focus(); return; }
+  if (!isMulti()){
+    const id = "l" + Date.now().toString(36);
+    players = {...players, [id]: {name, gameId:S.gameId, guesses:{}}};
+    $("name").value = "";
+    renderPlayers(); renderDyn(); return;
+  }
+  const me = players[myId];
+  try { localStorage.setItem("geheimakte-name", name); } catch(e){}
+  const body = me && me.gameId === S.gameId ? {...me, name, lastSeen:Date.now()} : {name, gameId:S.gameId, guesses:{}, joinedAt:Date.now(), lastSeen:Date.now()};
+  note("");
+  savePlayer(body);
+}
+function newGame(){
+  if (!confirm("Neues Spiel starten? Punkte und gezogene Akten werden zurückgesetzt, alle tragen sich neu ein.")) return;
+  const g = "g" + Date.now().toString(36);
+  if (!isMulti()) players = Object.fromEntries(Object.entries(players).map(([id, p]) => [id, {...p, gameId:g, guesses:{}}]));
+  commit({...fresh(), round:S.round || 0, gameId:g});
+}
+let lastSpark = -1;
+function spark(){
+  let i; do { i = Math.floor(Math.random() * ZUENDSTOFF.length); } while (i === S.spark || i === lastSpark);
+  lastSpark = i; commit({spark:i});
+}
+function roles(){
+  const r = pickRoles();
+  if (!r){ $("roles").innerHTML = "<li>Mindestens zwei Mitspielende nötig.</li>"; return; }
+  commit({roles:r});
+}
+const remaining = () => S.timerEnd ? Math.max(0, Math.ceil((S.timerEnd - Date.now()) / 1000)) : S.timerLeft;
+function toggleTimer(){
+  if (S.timerEnd && remaining() > 0){ commit({timerEnd:null, timerLeft:remaining()}); return; }
+  const left = S.timerLeft > 0 && !S.timerEnd ? S.timerLeft : 180;
+  commit({timerEnd:Date.now() + left * 1000, timerLeft:left});
+}
+function resetTimer(){ commit({timerEnd:null, timerLeft:180}); }
+
+/* ---------- Anzeige ---------- */
+function render(){
+  $("counter").textContent = S.cur >= 0 ? `Akte ${S.pos} von ${AKTEN.length}` : `${AKTEN.length} Akten im Archiv`;
+  $("tab").textContent = S.cur >= 0 ? `Akte Nr. ${String(S.cur + 1).padStart(3, "0")}` : "Archiv";
+  if (S.cur < 0){
+    if (renderedRound !== "empty"){
+      $("sheet").innerHTML = `<div class="empty"><p>Im Archiv liegen ${AKTEN.length} Akten – von Mondlandung bis Bielefeld. Einige sind widerlegt, einige Satire und ein paar leider wahr.</p><button class="ghost act" onclick="draw()">Erste Akte ziehen</button></div>`;
+      renderedRound = "empty";
+    }
+  } else if (renderedRound !== S.round){
+    renderCard(); renderedRound = S.round;
+  }
+  renderPlayers(); renderDyn();
+}
+
+function renderCard(){
+  const a = AKTEN[S.cur], st = STATUS[a.s];
+  $("sheet").innerHTML = `
+    <div class="stamp ${st.c}" id="stamp">${st.label}</div>
+    <p class="cat">${esc(a.k)}</p>
+    <h2 class="title">${esc(a.t)}</h2>
+    <h3 style="margin-top:.4rem">Die Behauptung</h3>
+    <p>${esc(a.th)}</p>
+    <div class="guess">
+      <p id="gq">Was glaubt ihr: wahr, teilweise wahr, widerlegt oder Satire?</p>
+      <div class="gb act" id="gb">${GUESS.map(([v, l]) => `<button data-g="${v}" onclick="guess('${v}')">${l}</button>`).join("")}</div>
+      <div class="guess-foot">
+        <button class="primary act" id="reveal" onclick="reveal()">Akte entschwärzen</button>
+        <span id="tally"></span>
+      </div>
+    </div>
+    <h3>Was dahintersteckt</h3>
+    <p class="facts redacted" id="facts" aria-hidden="true"><span class="r">${esc(a.f)}</span></p>
+    <ul class="results" id="results"></ul>
+
+    <h3>Fragen für die Runde</h3>
+    <ol class="q">${a.q.map(x => `<li>${esc(x)}</li>`).join("")}</ol>
+
+    <h3>Stichworte zum Anheizen</h3>
+    <ul class="chips">${a.w.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+    <p class="hint">Wer ein Stichwort ins Gespräch bringt, muss erklären, was es mit der Theorie zu tun hat.</p>
+
+    <div class="tools">
+      <div>
+        <h3>Zündstoff</h3>
+        <button class="ghost act" onclick="spark()">Zündstoff nachlegen</button>
+        <p class="spark" id="spark"></p>
+      </div>
+      <div>
+        <h3>Rollen</h3>
+        <ul class="roles" id="roles"></ul>
+        <button class="ghost act" onclick="roles()">Rollen neu verteilen</button>
+      </div>
+      <div>
+        <h3>Redezeit</h3>
+        <div class="timer" id="timer">3:00</div>
+        <div class="row act">
+          <button class="ghost" id="tbtn" onclick="toggleTimer()">Start</button>
+          <button class="ghost" onclick="resetTimer()">Zurücksetzen</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderDyn(){
+  if (S.cur < 0 || !$("facts")) return;
+  const a = AKTEN[S.cur], rev = !!S.revealed, multi = isMulti();
+  const f = $("facts");
+  f.classList.toggle("redacted", !rev);
+  rev ? f.removeAttribute("aria-hidden") : f.setAttribute("aria-hidden", "true");
+  $("stamp").classList.toggle("on", rev);
+  const rb = $("reveal"); rb.disabled = rev; rb.textContent = rev ? "Entschwärzt" : "Akte entschwärzen";
+
+  const list = joined();
+  const mine = amJoined() ? (players[myId].guesses || {})[S.round] : null;
+  $("gb").style.display = multi && !readOnly ? "" : "none";
+  $("gb").querySelectorAll("button").forEach(b => { b.classList.toggle("sel", b.dataset.g === mine); b.disabled = rev; });
+  $("gq").textContent = multi ? (rev ? "Die Tipps sind abgegeben." : "Jede Person tippt auf ihrem Gerät – danach entschwärzen.") : "Erst per Handzeichen tippen: wahr, teilweise wahr, widerlegt oder Satire?";
+  const tipped = list.filter(([, p]) => p.guesses && p.guesses[S.round]).length;
+  $("tally").textContent = multi && list.length ? `${tipped} von ${list.length} haben getippt` : "";
+
+  const res = $("results");
+  if (multi && rev && list.length){
+    const right = ANS[a.s];
+    res.innerHTML = list.map(([id, p]) => {
+      const g = p.guesses && p.guesses[S.round];
+      if (!g) return `<li>${esc(p.name)}: kein Tipp</li>`;
+      const ok = g === right;
+      return `<li>${esc(p.name)}: ${GLABEL[g]} <span class="${ok ? "ok" : "no"}">${ok ? "✓ +1" : "✗"}</span></li>`;
+    }).join("");
+  } else res.innerHTML = "";
+
+  $("spark").textContent = S.spark >= 0 ? ZUENDSTOFF[S.spark] : "Wenn die Diskussion stockt: hier einen neuen Impuls ziehen.";
+  const nm = id => (players[id] && players[id].name) || "?";
+  $("roles").innerHTML = S.roles
+    ? `<li><b>${esc(nm(S.roles.d))}</b> verteidigt die Theorie – egal, was sie oder er glaubt.</li><li><b>${esc(nm(S.roles.c))}</b> prüft jedes Argument auf Belege.</li><li>Alle anderen sind Jury.</li>`
+    : `<li>${list.length < 2 ? "Sobald zwei mitspielen, werden Rollen verteilt." : "Noch keine Rollen verteilt."}</li>`;
+  tick();
+}
+
+function renderPlayers(){
+  const list = joined().sort((x, y) => score(y[1]) - score(x[1]) || String(x[1].name).localeCompare(String(y[1].name)));
+  $("pl").innerHTML = list.length ? list.map(([id, p]) => {
+    const g = S.cur >= 0 && !S.revealed && p.guesses && p.guesses[S.round];
+    const dot = isMulti() ? `<span class="dot${isOn(p) ? " on" : ""}" title="${isOn(p) ? "online" : "nicht online"}"></span>` : "";
+    return `<li>${dot}<span>${esc(p.name)}${id === myId ? " (du)" : ""}</span>${isMulti() ? `<span class="pts">${score(p)}</span>` : ""}${g ? `<span class="tip">getippt</span>` : ""}</li>`;
+  }).join("") : `<li class="none" style="background:none;border:0;padding-left:0">Noch niemand eingetragen.</li>`;
+
+  const showJoin = !readOnly && (!isMulti() || !amJoined());
+  $("join").style.display = showJoin ? "" : "none";
+  $("joinbtn").textContent = isMulti() ? "Mitspielen" : "Hinzufügen";
+  const inp = $("name");
+  if (isMulti() && showJoin && !inp.value && document.activeElement !== inp){
+    inp.value = (players[myId] && players[myId].name) || savedName() || "";
+  }
+}
+
+function tick(){
+  const t = $("timer"); if (!t) return;
+  const r = remaining(), running = !!S.timerEnd && r > 0;
+  t.textContent = S.timerEnd && r === 0 ? "Zeit!" : `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`;
+  t.classList.toggle("done", !!S.timerEnd && r === 0);
+  const b = $("tbtn"); if (b) b.textContent = running ? "Pause" : (S.timerLeft < 180 && !S.timerEnd ? "Weiter" : "Start");
+}
+setInterval(tick, 500);
+
+/* ---------- Verbindung ---------- */
+const isOn = p => !!p.lastSeen && Date.now() - p.lastSeen < 75000;
+function savedName(){ try { return localStorage.getItem("geheimakte-name") || ""; } catch(e){ return ""; } }
+function getPid(){
+  try {
+    let p = localStorage.getItem("geheimakte-pid");
+    if (!p){ p = "p" + Math.random().toString(36).slice(2, 12) + Date.now().toString(36); localStorage.setItem("geheimakte-pid", p); }
+    return p;
+  } catch(e){ return "p" + Math.random().toString(36).slice(2, 12); }
+}
+function makeCode(){ const c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = ""; for (let i = 0; i < 5; i++) s += c[Math.floor(Math.random() * c.length)]; return s; }
+function roomFromHash(){ const h = location.hash.replace("#", "").toUpperCase(); return /^[A-Z0-9]{4,12}$/.test(h) ? h : null; }
+function copyLink(){
+  const url = location.href;
+  const done = () => { $("copybtn").textContent = "Link kopiert"; setTimeout(() => $("copybtn").textContent = "Einladungslink kopieren", 2000); };
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, () => prompt("Link kopieren:", url));
+  else prompt("Link kopieren:", url);
+}
+function newRoom(){ location.hash = makeCode(); location.reload(); }
+window.addEventListener("hashchange", () => location.reload());
+
+function goLocal(msg){
+  mode = "local"; myId = null;
+  $("mode").className = "mode";
+  $("mode").textContent = "Nur auf diesem Gerät";
+  note(msg || "Ihr spielt gemeinsam an einem Bildschirm. Namen eintragen, damit Rollen verteilt werden können.");
+  render();
+}
+
+render();
+(async () => {
+  if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.projectId){ goLocal(); return; }
+  let fb;
+  try {
+    const [appMod, fsMod] = await Promise.all([
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js"),
+      import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js")
+    ]);
+    fb = {...appMod, ...fsMod};
+  } catch(e){ goLocal("Firebase konnte nicht geladen werden – ihr spielt an einem Bildschirm."); return; }
+
+  let code = roomFromHash();
+  if (!code){ code = makeCode(); history.replaceState(null, "", "#" + code); }
+  $("roomcode").textContent = code; $("roomline").hidden = false;
+
+  const app = fb.initializeApp(FIREBASE_CONFIG, "geheimakte");
+  const db = fb.getFirestore(app);
+  myId = getPid(); mode = "multi";
+  stateRef = { set: b => fb.setDoc(fb.doc(db, "rooms", code), b) };
+  playersCol = { doc: id => ({ set: b => fb.setDoc(fb.doc(db, "rooms", code, "players", id), b) }) };
+  $("mode").className = "mode live"; $("mode").textContent = "Live verbunden";
+
+  let loaded = false;
+  const t = setTimeout(() => { if (!loaded) note("Der Spielstand lädt noch – die Verbindung ist gerade langsam."); }, 10000);
+  fb.onSnapshot(fb.doc(db, "rooms", code), s => {
+    if (!loaded){ loaded = true; clearTimeout(t); note(""); }
+    if (s.exists()) S = {...fresh(), ...s.data()};
+    render();
+  }, e => { clearTimeout(t); onWriteErr(e); });
+  fb.onSnapshot(fb.collection(db, "rooms", code, "players"), q => {
+    const m = {}; q.forEach(d => { m[d.id] = d.data(); });
+    players = m; renderPlayers(); renderDyn();
+  }, onWriteErr);
+
+  // Lebenszeichen alle 30 Sekunden, solange die Seite offen ist
+  setInterval(() => {
+    if (document.visibilityState === "visible" && amJoined()) savePlayer({...players[myId], lastSeen:Date.now()});
+    else renderPlayers();
+  }, 30000);
+  render();
+})();
+
+Object.assign(window, {draw, reveal, guess, join, newGame, spark, roles, toggleTimer, resetTimer, copyLink, newRoom});
+</script>
+</body>
+</html>
